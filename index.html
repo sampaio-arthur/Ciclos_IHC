@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<!--
+================================================================================
+  PROTÓTIPO DE ALTA FIDELIDADE · CICLO 2 · DISCIPLINA DE IHC
+================================================================================
+  Projeto....: Avaliação de Usabilidade do Goodreads
+  Disciplina.: Interação Humano-Computador (IHC) — UFSC Araranguá
+  Professor..: Matheus Cataneo
+  Autores....: Arthur Sampaio · Leonardo Boteon
+  Telas......: A) Encontrar Amigos    B) Selecionar Gêneros
+
+  MELHORIAS APLICADAS NESTE CICLO
+  ------------------------------------------------------------------------------
+  P1 — Tradução integral da interface para PT-BR
+       Heurística: H4 (Consistência e Padrões) · Aula 5, Critério 8
+                   (Compatibilidade / Localização)
+
+  P2 — Categorização dos 40 gêneros em 6 grupos semânticos
+       Heurística: H6 (Reconhecimento em vez de Recordação)
+                   Aula 2 (Limite de Miller 7±2 e hierarquia visual)
+                   Aula 4 (Critério 1 — Agrupamento por formato e localização)
+                   Aula 6 (Passo 5 — Agrupar opções em N categorias)
+
+  DECISÕES DE DESIGN PRINCIPAIS
+  ------------------------------------------------------------------------------
+  • Tipografia editorial (Fraunces serif + Outfit sans) ........... Aula 2
+  • Espaçamento generoso, baixa densidade informacional .......... Aula 4 C2
+  • Chips/pills em vez de checkboxes para os gêneros ............. Aula 7
+  • Estado de seleção redundante (cor + ícone + peso) ............ Aula 9 WCAG
+  • Foco visível customizado em todos os interativos ............. Aula 9 WCAG
+  • Contador em tempo real e CTA validacional .................... H5 prev. erros
+  • Stepper com 4 etapas reflete progresso (concluído/ativo/pendente)  H1 visib.
+  • Transição entre telas com fade + slide curto (250ms) ......... micro-UX
+================================================================================
+-->
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Goodreads · Primeiros Passos</title>
+
+  <!-- Tailwind via CDN (sem build) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Tipografia: Fraunces (serif editorial) + Outfit (sans humanista) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ============================================================
+       Tokens · Paleta inspirada no Goodreads, elevada
+       ============================================================ */
+    :root {
+      --gr-ink:      #382110;  /* marrom escuro · textos e CTAs */
+      --gr-espresso: #58371F;  /* marrom médio · hover/ativo */
+      --gr-paper:    #F4F1EA;  /* bege · fundo de superfícies */
+      --gr-cream:    #FAF8F2;  /* bege claríssimo · cards */
+      --gr-sand:     #E9E5D0;  /* bege médio · bordas/separadores */
+      --gr-tea:      #00635D;  /* teal · links (cor histórica do GR) */
+      --gr-moss:     #4A6741;  /* verde sutil · estados positivos */
+      --gr-rust:     #B85C38;  /* terracota · acento ocasional */
+      --gr-shadow:   0 1px 2px rgba(56,33,16,.04), 0 8px 24px rgba(56,33,16,.06);
+      --gr-shadow-lg:0 2px 4px rgba(56,33,16,.05), 0 16px 40px rgba(56,33,16,.10);
+    }
+
+    html, body { background: var(--gr-paper); color: var(--gr-ink); }
+    body {
+      font-family: 'Outfit', system-ui, sans-serif;
+      font-feature-settings: "ss01", "ss02";
+      -webkit-font-smoothing: antialiased;
+      /* Textura de papel muito sutil para evocar a "alma de livro" */
+      background-image:
+        radial-gradient(circle at 25% 10%, rgba(184,92,56,.04) 0, transparent 40%),
+        radial-gradient(circle at 80% 80%, rgba(74,103,65,.03) 0, transparent 45%);
+    }
+
+    .font-serif-display { font-family: 'Fraunces', Georgia, serif; font-optical-sizing: auto; }
+
+    /* ============================================================
+       Foco visível customizado (WCAG · Aula 9)
+       ============================================================ */
+    *:focus { outline: none; }
+    *:focus-visible {
+      outline: 2.5px solid var(--gr-tea);
+      outline-offset: 3px;
+      border-radius: 6px;
+    }
+
+    /* ============================================================
+       Stepper · chevrons conectados
+       ============================================================ */
+    .step {
+      position: relative;
+      padding: 10px 22px 10px 28px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: .01em;
+      color: #9a8a78;
+      background: transparent;
+      white-space: nowrap;
+    }
+    .step + .step { margin-left: -10px; }
+    .step::before, .step::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      width: 14px;
+      height: 100%;
+      background: inherit;
+    }
+    .step::before { left: -7px; transform: skewX(-22deg); border-top-left-radius: 4px; border-bottom-left-radius: 4px; }
+    .step::after  { right: -7px; transform: skewX(-22deg); border-top-right-radius: 4px; border-bottom-right-radius: 4px; }
+    .step:first-child::before { display: none; padding-left: 0; }
+    .step:first-child { border-top-left-radius: 6px; border-bottom-left-radius: 6px; padding-left: 18px; }
+    .step:last-child::after { display: none; }
+    .step:last-child { border-top-right-radius: 6px; border-bottom-right-radius: 6px; padding-right: 22px; }
+
+    .step.done    { background: var(--gr-sand); color: #6b5947; }
+    .step.done::before, .step.done::after { background: var(--gr-sand); }
+    .step.active  { background: var(--gr-ink); color: #fff; font-weight: 600; }
+    .step.active::before, .step.active::after { background: var(--gr-ink); }
+    .step.pending { background: rgba(233,229,208,.45); color: #b3a695; }
+    .step.pending::before, .step.pending::after { background: rgba(233,229,208,.45); }
+
+    /* ============================================================
+       Cards de categoria (Tela B)
+       ============================================================ */
+    .cat-card {
+      background: #fff;
+      border: 1px solid var(--gr-sand);
+      border-radius: 14px;
+      padding: 22px 22px 18px;
+      box-shadow: var(--gr-shadow);
+      transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+    }
+    .cat-card:hover { box-shadow: var(--gr-shadow-lg); border-color: #d8d2b6; }
+    .cat-card__head { display:flex; align-items:baseline; justify-content:space-between; margin-bottom: 14px; }
+    .cat-card__title { display:flex; align-items:center; gap:10px; font-family:'Fraunces',serif; font-weight:600; font-size:20px; color: var(--gr-ink); }
+    .cat-card__icon  { font-size: 22px; line-height:1; }
+    .cat-card__count { font-size: 12px; color:#9a8a78; letter-spacing:.02em; }
+
+    /* ============================================================
+       Chips de gênero · estado redundante (cor + ícone + peso)
+       ============================================================ */
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 13px;
+      margin: 3px 4px 3px 0;
+      font-size: 14px;
+      font-weight: 400;
+      color: var(--gr-ink);
+      background: var(--gr-cream);
+      border: 1px solid var(--gr-sand);
+      border-radius: 999px;
+      cursor: pointer;
+      user-select: none;
+      transition: all .18s ease;
+    }
+    .chip:hover {
+      transform: translateY(-1px);
+      border-color: var(--gr-espresso);
+      background: #fff;
+      box-shadow: 0 4px 10px rgba(56,33,16,.08);
+    }
+    .chip .chip__check { width: 0; opacity: 0; transition: all .18s ease; display:inline-flex; align-items:center; }
+    .chip[aria-pressed="true"] {
+      background: var(--gr-ink);
+      color: #fff;
+      border-color: var(--gr-ink);
+      font-weight: 600;
+    }
+    .chip[aria-pressed="true"]:hover { background: var(--gr-espresso); border-color: var(--gr-espresso); }
+    .chip[aria-pressed="true"] .chip__check { width: 14px; opacity: 1; }
+
+    /* ============================================================
+       Transição entre telas
+       ============================================================ */
+    .screen { display: none; animation: none; }
+    .screen.active {
+      display: block;
+      animation: fadeSlide .28s ease both;
+    }
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ============================================================
+       CTAs
+       ============================================================ */
+    .btn-primary {
+      background: var(--gr-ink);
+      color: #fff;
+      padding: 13px 24px;
+      border-radius: 10px;
+      font-weight: 600;
+      letter-spacing: .005em;
+      transition: background .2s ease, transform .15s ease, box-shadow .2s ease;
+      box-shadow: 0 2px 0 rgba(56,33,16,.18);
+    }
+    .btn-primary:hover { background: var(--gr-espresso); }
+    .btn-primary:active { transform: translateY(1px); box-shadow: 0 1px 0 rgba(56,33,16,.18); }
+    .btn-primary[disabled] {
+      background: var(--gr-sand);
+      color: #9a8a78;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    .btn-ghost {
+      color: var(--gr-tea);
+      font-weight: 500;
+      border-bottom: 1px solid transparent;
+      transition: border-color .2s ease;
+    }
+    .btn-ghost:hover { border-bottom-color: var(--gr-tea); }
+
+    /* Botão Gmail · card-button */
+    .gmail-btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      width: 100%;
+      max-width: 360px;
+      padding: 16px 22px;
+      background: #fff;
+      border: 1px solid var(--gr-sand);
+      border-radius: 12px;
+      transition: transform .18s ease, box-shadow .25s ease, border-color .25s ease;
+      box-shadow: var(--gr-shadow);
+    }
+    .gmail-btn:hover {
+      transform: translateY(-1px);
+      border-color: #d8d2b6;
+      box-shadow: var(--gr-shadow-lg);
+    }
+    .gmail-btn__label {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 500;
+      font-size: 18px;
+      letter-spacing: -.01em;
+      color: #3c4043;
+    }
+
+    /* ============================================================
+       Banner informativo da Tela B
+       ============================================================ */
+    .info-banner {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      background: linear-gradient(180deg, #FAF8F2 0%, #F0EEE4 100%);
+      border: 1px solid var(--gr-sand);
+      border-left: 4px solid var(--gr-moss);
+      padding: 16px 20px;
+      border-radius: 10px;
+      color: #4a3a28;
+      font-size: 14.5px;
+      line-height: 1.55;
+    }
+
+    /* ============================================================
+       Detalhe editorial · filete e numeração ordinal
+       ============================================================ */
+    .rule { height: 1px; background: var(--gr-sand); }
+    .ordinal { font-family: 'Fraunces', serif; font-style: italic; color: #b3a695; font-weight: 400; }
+
+    /* ============================================================
+       Responsividade do stepper
+       ============================================================ */
+    @media (max-width: 768px) {
+      .step { font-size: 11px; padding: 8px 14px 8px 18px; }
+      .step__num { display: none; }
+    }
+    @media (max-width: 480px) {
+      .step__label { display: none; }
+      .step { padding: 8px 10px; }
+      .step__num { display: inline; font-weight: 700; }
+    }
+
+    /* Util · esconde visualmente mas mantém para leitores de tela */
+    .sr-only {
+      position: absolute; width: 1px; height: 1px;
+      padding: 0; margin: -1px; overflow: hidden;
+      clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+    }
+  </style>
+</head>
+<body class="min-h-screen">
+
+  <!-- ============================================================
+       CABEÇALHO PERSISTENTE
+       ============================================================ -->
+  <header class="border-b border-[#E9E5D0]/70 bg-[#FAF8F2]/80 backdrop-blur sticky top-0 z-20">
+    <div class="max-w-6xl mx-auto px-5 md:px-8 py-4 flex items-center gap-6 md:gap-10">
+      <!-- Logo (estilizado, evocando o original sem reproduzi-lo) -->
+      <a href="#" class="font-serif-display italic text-2xl md:text-[26px] font-bold tracking-tight text-[var(--gr-ink)] shrink-0" aria-label="Goodreads">
+        goodreads
+      </a>
+
+      <span class="hidden sm:inline-block w-px h-7 bg-[var(--gr-sand)]"></span>
+
+      <div class="hidden sm:flex items-center gap-2">
+        <span class="font-serif-display text-[15px] md:text-base text-[var(--gr-espresso)] font-medium tracking-tight">Primeiros Passos</span>
+      </div>
+
+      <!-- Stepper · 4 etapas -->
+      <nav class="ml-auto flex items-center" aria-label="Progresso do cadastro">
+        <div id="step-1" class="step active">
+          <span class="step__num">1.</span> <span class="step__label">Encontrar amigos</span>
+        </div>
+        <div id="step-2" class="step pending">
+          <span class="step__num">2.</span> <span class="step__label">Meta de leitura</span>
+        </div>
+        <div id="step-3" class="step pending">
+          <span class="step__num">3.</span> <span class="step__label">Avaliar livros</span>
+        </div>
+        <div id="step-4" class="step pending">
+          <span class="step__num">4.</span> <span class="step__label">Ver recomendações</span>
+        </div>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-5 md:px-8 py-10 md:py-16">
+
+    <!-- ============================================================
+         TELA A · ENCONTRAR AMIGOS
+         ============================================================ -->
+    <section id="screen-a" class="screen active" aria-labelledby="title-a">
+
+      <!-- Mini-numeração editorial -->
+      <p class="ordinal text-sm mb-3">Etapa 01 de 04</p>
+
+      <div class="grid grid-cols-1 lg:grid-cols-[1.45fr_1fr] gap-10 lg:gap-16 items-start">
+
+        <!-- Coluna principal -->
+        <div>
+          <h1 id="title-a" class="font-serif-display text-[34px] sm:text-[42px] lg:text-[48px] leading-[1.08] font-bold text-[var(--gr-ink)] tracking-tight">
+            Receba recomendações<br/>
+            de livros dos seus <em class="italic text-[var(--gr-espresso)]">amigos</em>.
+          </h1>
+
+          <p class="mt-5 text-[17px] leading-relaxed text-[#5a4a38] max-w-[520px]">
+            Verifique seu catálogo de endereços para encontrar amigos no Goodreads:
+          </p>
+
+          <!-- Botão Gmail -->
+          <button type="button" class="gmail-btn mt-7 group" aria-label="Conectar com Gmail">
+            <span class="flex items-center gap-4">
+              <!-- Ícone Gmail · SVG inline · brand colors -->
+              <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true">
+                <path fill="#4285F4" d="M2 6.5v11A1.5 1.5 0 0 0 3.5 19H5V8.7l7 5.1 7-5.1V19h1.5A1.5 1.5 0 0 0 22 17.5v-11L12 13.8 2 6.5z"/>
+                <path fill="#34A853" d="M5 19V8.7l7 5.1V19H5z"/>
+                <path fill="#FBBC04" d="M19 8.7V19h-7v-5.2l7-5.1z"/>
+                <path fill="#EA4335" d="M2 6.5L12 13.8 22 6.5V5a1.5 1.5 0 0 0-1.5-1.5h-17A1.5 1.5 0 0 0 2 5v1.5z"/>
+                <path fill="#C5221F" d="M2 6.5V5a1.5 1.5 0 0 1 1.5-1.5H5v5.2L2 6.5z"/>
+              </svg>
+              <span class="gmail-btn__label">Gmail</span>
+            </span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true" class="text-[#9a8a78] group-hover:text-[var(--gr-espresso)] transition-colors">
+              <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+
+          <p class="mt-3 ml-1">
+            <a href="#" class="btn-ghost text-[14.5px]">ou envie seu próprio convite »</a>
+          </p>
+        </div>
+
+        <!-- Coluna lateral · explicação -->
+        <aside class="lg:pt-3">
+          <div class="lg:border-l lg:border-[var(--gr-sand)] lg:pl-8">
+            <p class="text-[15px] leading-[1.7] text-[#5a4a38]">
+              Comparamos seu catálogo de endereços com todos os
+              <strong class="text-[var(--gr-ink)] font-semibold">90&nbsp;milhões de membros</strong>
+              do Goodreads e mostramos quem já está no site. Você também pode convidar amigos
+              que ainda não estão cadastrados para comparar livros com eles.
+            </p>
+
+            <div class="rule my-7"></div>
+
+            <p class="text-right">
+              <a href="#" class="btn-ghost text-[14px]" id="skip-a">Pular esta etapa »</a>
+            </p>
+          </div>
+        </aside>
+      </div>
+
+      <!-- Controle do protótipo (rodapé local da tela) -->
+      <div class="mt-16 pt-8 border-t border-[var(--gr-sand)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <p class="text-xs uppercase tracking-[.14em] text-[#9a8a78]">Protótipo · Ciclo 2 IHC</p>
+        <button type="button" id="goto-b" class="btn-primary inline-flex items-center gap-2">
+          Próxima tela: Selecionar gêneros
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+    </section>
+
+
+    <!-- ============================================================
+         TELA B · SELECIONAR GÊNEROS
+         · É AQUI QUE A MELHORIA P2 ACONTECE
+         ============================================================ -->
+    <section id="screen-b" class="screen" aria-labelledby="title-b">
+
+      <p class="ordinal text-sm mb-3">Etapa 03 de 04</p>
+
+      <div class="max-w-4xl">
+        <h1 id="title-b" class="font-serif-display text-[32px] sm:text-[40px] lg:text-[44px] leading-[1.1] font-bold text-[var(--gr-ink)] tracking-tight">
+          A seguir, selecione seus <em class="italic text-[var(--gr-espresso)]">gêneros favoritos</em>.
+        </h1>
+
+        <!-- Banner informativo -->
+        <div class="info-banner mt-7" role="note">
+          <!-- Ícone livro/info -->
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true" class="shrink-0 mt-[2px] text-[var(--gr-moss)]">
+            <path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H11v16H5.5A1.5 1.5 0 0 1 4 17.5v-13zM20 4.5A1.5 1.5 0 0 0 18.5 3H13v16h5.5a1.5 1.5 0 0 0 1.5-1.5v-13z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+          </svg>
+          <p>
+            Usamos seus gêneros favoritos para fazer
+            <strong class="text-[var(--gr-ink)]">melhores recomendações de livros</strong>
+            e personalizar o que você vê em seu feed de Novidades.
+          </p>
+        </div>
+      </div>
+
+      <!-- Grade de 6 categorias -->
+      <!--
+        Decisão de design (Aula 6 · Passo 5): os 40 gêneros do original foram
+        agrupados em 6 categorias semânticas, respeitando o limite de Miller
+        (7±2) e aplicando o Critério 1 (Agrupamento por formato/localização).
+      -->
+      <div id="cat-grid" class="mt-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6">
+        <!-- Categorias são renderizadas via JS · ver script no final -->
+      </div>
+
+      <!-- Link discreto -->
+      <p class="mt-8">
+        <a href="#" class="btn-ghost text-[14px]">Não vê seus gêneros favoritos aqui?</a>
+      </p>
+
+      <!-- Rodapé de ação -->
+      <div class="mt-10 pt-8 border-t border-[var(--gr-sand)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
+        <div>
+          <p id="counter" class="text-[15px] text-[#5a4a38]" aria-live="polite">
+            <strong class="text-[var(--gr-ink)] font-semibold">0</strong> gêneros selecionados
+          </p>
+          <p class="text-xs text-[#9a8a78] mt-1">Você pode editar isso depois nas suas preferências.</p>
+        </div>
+
+        <div class="flex items-center gap-4">
+          <button type="button" id="back-a" class="btn-ghost text-[14.5px] inline-flex items-center gap-1">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M19 12H5M11 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Voltar
+          </button>
+          <button type="button" id="continue-btn" class="btn-primary inline-flex items-center gap-2" disabled>
+            <span id="continue-label">Selecione ao menos um gênero para continuar</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="max-w-6xl mx-auto px-5 md:px-8 py-8 text-xs text-[#9a8a78] flex flex-col sm:flex-row justify-between gap-2">
+    <span>© Protótipo acadêmico · não é o Goodreads oficial</span>
+    <span class="font-serif-display italic">Ciclo 2 de Engenharia de Usabilidade</span>
+  </footer>
+
+  <!-- ============================================================
+       SCRIPT · estado, render e interações
+       ============================================================ -->
+  <script>
+    /* ---------------------------------------------------------------
+       DADOS · 6 categorias × 40 gêneros (conforme spec §5.4)
+       --------------------------------------------------------------- */
+    const CATEGORIES = [
+      {
+        id: 'formato',
+        icon: '📐',
+        title: 'Formato',
+        genres: ['Quadrinhos', 'E-book', 'Graphic Novel', 'Mangá', 'Poesia']
+      },
+      {
+        id: 'nao-ficcao',
+        icon: '📖',
+        title: 'Não-Ficção',
+        genres: ['Biografia', 'Negócios', 'Cristão', 'Culinária', 'Memórias', 'Não-Ficção', 'Religião', 'Espiritualidade', 'Autoajuda']
+      },
+      {
+        id: 'ficcao',
+        icon: '🐉',
+        title: 'Ficção',
+        genres: ['Fantasia', 'Ficção', 'Ficção Histórica', 'Ficção Científica']
+      },
+      {
+        id: 'temas',
+        icon: '🎭',
+        title: 'Temas',
+        genres: ['Crime', 'Terror', 'Mistério', 'Paranormal', 'Romance', 'Suspense', 'Thriller']
+      },
+      {
+        id: 'assunto',
+        icon: '🎨',
+        title: 'Assunto',
+        genres: ['Arte', 'LGBTQIA+', 'História', 'Humor', 'Música', 'Psicologia', 'Ciência', 'Esportes', 'Viagem']
+      },
+      {
+        id: 'literatura',
+        icon: '📚',
+        title: 'Literatura',
+        genres: ['Chick Lit', 'Infantil', 'Clássicos', 'Contemporâneo', 'Jovem Adulto']
+      }
+    ];
+
+    /* ---------------------------------------------------------------
+       RENDER · cards de categoria + chips
+       --------------------------------------------------------------- */
+    const grid = document.getElementById('cat-grid');
+    const selected = new Set();
+
+    CATEGORIES.forEach(cat => {
+      const card = document.createElement('section');
+      card.className = 'cat-card';
+      card.setAttribute('aria-labelledby', `cat-title-${cat.id}`);
+
+      card.innerHTML = `
+        <header class="cat-card__head">
+          <h2 id="cat-title-${cat.id}" class="cat-card__title">
+            <span class="cat-card__icon" aria-hidden="true">${cat.icon}</span>
+            <span>${cat.title}</span>
+          </h2>
+          <span class="cat-card__count">${cat.genres.length} gêneros</span>
+        </header>
+        <div class="flex flex-wrap" role="group" aria-label="Gêneros de ${cat.title}">
+          ${cat.genres.map(g => `
+            <button type="button"
+                    class="chip"
+                    role="switch"
+                    aria-pressed="false"
+                    aria-label="${g}"
+                    data-genre="${g}">
+              <span class="chip__check" aria-hidden="true">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </span>
+              <span class="chip__label">${g}</span>
+            </button>
+          `).join('')}
+        </div>
+      `;
+      grid.appendChild(card);
+    });
+
+    /* ---------------------------------------------------------------
+       INTERAÇÃO · seleção de chips, contador, estado do CTA
+       Decisão (Aula 9): chips são <button role="switch"> com
+       aria-pressed; respondem a clique E teclado (Enter/Espaço nativos).
+       --------------------------------------------------------------- */
+    const counterEl  = document.getElementById('counter');
+    const continueBtn = document.getElementById('continue-btn');
+    const continueLabel = document.getElementById('continue-label');
+
+    grid.addEventListener('click', (e) => {
+      const chip = e.target.closest('.chip');
+      if (!chip) return;
+      toggleChip(chip);
+    });
+
+    function toggleChip(chip) {
+      const genre = chip.dataset.genre;
+      const isOn  = chip.getAttribute('aria-pressed') === 'true';
+      const next  = !isOn;
+      chip.setAttribute('aria-pressed', String(next));
+      if (next) selected.add(genre); else selected.delete(genre);
+      updateUI();
+    }
+
+    function updateUI() {
+      const n = selected.size;
+      counterEl.innerHTML = `<strong class="text-[var(--gr-ink)] font-semibold">${n}</strong> gênero${n === 1 ? '' : 's'} selecionado${n === 1 ? '' : 's'}`;
+
+      if (n === 0) {
+        continueBtn.disabled = true;
+        continueLabel.textContent = 'Selecione ao menos um gênero para continuar';
+      } else {
+        continueBtn.disabled = false;
+        continueLabel.textContent = `Continuar com ${n} gênero${n === 1 ? '' : 's'} selecionado${n === 1 ? '' : 's'}`;
+      }
+    }
+
+    /* ---------------------------------------------------------------
+       NAVEGAÇÃO ENTRE TELAS + atualização do stepper
+       --------------------------------------------------------------- */
+    const screenA = document.getElementById('screen-a');
+    const screenB = document.getElementById('screen-b');
+    const steps   = [1,2,3,4].map(i => document.getElementById(`step-${i}`));
+
+    function showScreen(which) {
+      if (which === 'a') {
+        screenA.classList.add('active');
+        screenB.classList.remove('active');
+        // Stepper: Encontrar amigos = ativa, restante pendente
+        setStep(steps[0], 'active');
+        setStep(steps[1], 'pending');
+        setStep(steps[2], 'pending');
+        setStep(steps[3], 'pending');
+      } else {
+        screenB.classList.add('active');
+        screenA.classList.remove('active');
+        // Stepper: 1 e 2 concluídas, 3 ativa, 4 pendente
+        setStep(steps[0], 'done');
+        setStep(steps[1], 'done');
+        setStep(steps[2], 'active');
+        setStep(steps[3], 'pending');
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function setStep(el, state) {
+      el.classList.remove('done','active','pending');
+      el.classList.add(state);
+    }
+
+    document.getElementById('goto-b').addEventListener('click', () => showScreen('b'));
+    document.getElementById('back-a').addEventListener('click', () => showScreen('a'));
+    document.getElementById('skip-a').addEventListener('click', (e) => { e.preventDefault(); showScreen('b'); });
+  </script>
+</body>
+</html>
