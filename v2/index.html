@@ -1,0 +1,1523 @@
+<!DOCTYPE html>
+<!--
+================================================================================
+  PROTÓTIPO DE ALTA FIDELIDADE · CICLO 3 · DISCIPLINA DE IHC
+================================================================================
+  Projeto....: Avaliação de Usabilidade do Goodreads
+  Disciplina.: Interação Humano-Computador (IHC) — UFSC Araranguá
+  Professor..: Matheus Cataneo
+  Autores....: Arthur Sampaio · Leonardo Boteon
+  Telas......: A) Encontrar Amigos    B) Escolher Gêneros
+
+  MELHORIAS APLICADAS NESTE CICLO (sobre o Ciclo 2)
+  ------------------------------------------------------------------------------
+  P1 — Fluxo principal totalmente interativo
+       · Botão Gmail → modal de simulação confirmado
+       · Link "envie seu próprio convite" → input inline + validação
+       · Link "Não vê seus gêneros?" → input livre inline
+       · Botão Continuar habilitado → modal de confirmação
+       Heurísticas: H7 · Critério 1 Feedback · Critério 5 Erros · WCAG Operável
+
+  P2 — Faixa de seleção 3–10 com prevenção ativa (resolve P3 aberto)
+       · Mínimo 3, máximo 10 gêneros
+       · Microcopy permanente, shake animation, toast de limite
+       · Chips bloqueados quando limite atingido
+       Heurísticas: H5 · Critério 5 Proteção · Critério 2 Carga
+
+  P3 — Renomear "Avaliar livros" → "Escolher gêneros" + refatorar stepper
+       · Stepper de chevrons → pílulas + separador › (sem artefato visual)
+       Heurísticas: H2 · H4 · H8 · Critério 6 · Critério 7
+
+  P4 — Busca/filtro textual em tempo real na tela B
+       · Debounce 150ms, atalho /, ícone ×
+       Heurísticas: H7 · Critério 4 Flexibilidade · UI Pattern Busca
+
+  P5 — Diagnóstico explícito ao tentar avançar sem seleção suficiente
+       · Botão sempre clicável; shake + role="alert" ao clicar sem mínimo
+       Heurísticas: H9 · Critério 5 Mensagens · Critério 1 Feedback
+
+  P6 — Substituir 🐉 (Ficção) por 🌌
+       Heurísticas: H6 · Critério 7 Códigos · WCAG Compreensível
+
+  P7 — Revelação progressiva: colapso/expansão por categoria
+       · aria-expanded, aria-controls, operável por teclado
+       Heurísticas: H8 · H5 · Critério 2 Densidade · WCAG Operável
+
+  P8 — Fracionamento do formulário — ADIADO para Ciclo 4
+       (input livre incluído na P1 via link existente)
+================================================================================
+-->
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Goodreads · Primeiros Passos</title>
+  <meta name="description" content="Protótipo acadêmico de alta fidelidade do fluxo de onboarding do Goodreads, traduzido para PT-BR com melhorias de usabilidade IHC — Ciclo 3." />
+
+  <!-- Tailwind via CDN (sem build) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Tipografia: Fraunces (serif editorial) + Outfit (sans humanista) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ============================================================
+       Tokens · Paleta Goodreads elevada
+       ============================================================ */
+    :root {
+      --gr-ink:      #382110;
+      --gr-espresso: #58371F;
+      --gr-paper:    #F4F1EA;
+      --gr-cream:    #FAF8F2;
+      --gr-sand:     #E9E5D0;
+      --gr-tea:      #00635D;
+      --gr-moss:     #4A6741;
+      --gr-rust:     #B85C38;
+      --gr-error:    #C0392B;
+      --gr-warn:     #E67E22;
+      --gr-shadow:   0 1px 2px rgba(56,33,16,.04), 0 8px 24px rgba(56,33,16,.06);
+      --gr-shadow-lg:0 2px 4px rgba(56,33,16,.05), 0 16px 40px rgba(56,33,16,.10);
+    }
+
+    html, body { background: var(--gr-paper); color: var(--gr-ink); }
+    body {
+      font-family: 'Outfit', system-ui, sans-serif;
+      font-feature-settings: "ss01", "ss02";
+      -webkit-font-smoothing: antialiased;
+      background-image:
+        radial-gradient(circle at 25% 10%, rgba(184,92,56,.04) 0, transparent 40%),
+        radial-gradient(circle at 80% 80%, rgba(74,103,65,.03) 0, transparent 45%);
+    }
+
+    .font-serif-display { font-family: 'Fraunces', Georgia, serif; font-optical-sizing: auto; }
+
+    /* ============================================================
+       Foco visível customizado (WCAG · Aula 9)
+       ============================================================ */
+    *:focus { outline: none; }
+    *:focus-visible {
+      outline: 2.5px solid var(--gr-tea);
+      outline-offset: 3px;
+      border-radius: 6px;
+    }
+
+    /* ============================================================
+       STEPPER P3 — Pílulas independentes com separador › (sem skewX)
+       Resolve L3 (rótulo) e L4 (artefato visual do chevron)
+       ============================================================ */
+    .stepper {
+      display: flex;
+      align-items: center;
+      gap: 0;
+    }
+    .step-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: .01em;
+      white-space: nowrap;
+      transition: background .2s ease, color .2s ease;
+    }
+    .step-pill.done    { background: var(--gr-sand); color: #6b5947; }
+    .step-pill.active  { background: var(--gr-ink); color: #fff; font-weight: 600; }
+    .step-pill.pending { background: rgba(233,229,208,.45); color: #b3a695; }
+
+    .step-sep {
+      font-size: 14px;
+      color: #c8bfb0;
+      padding: 0 4px;
+      user-select: none;
+    }
+
+    @media (max-width: 768px) {
+      .step-pill { font-size: 11px; padding: 6px 10px; }
+      .step-pill__label { display: none; }
+    }
+    @media (max-width: 480px) {
+      .step-pill { padding: 5px 8px; }
+      .step-pill__num { display: inline; font-weight: 700; }
+    }
+
+    /* ============================================================
+       Cards de categoria (Tela B)
+       ============================================================ */
+    .cat-card {
+      background: #fff;
+      border: 1px solid var(--gr-sand);
+      border-radius: 14px;
+      padding: 0;
+      box-shadow: var(--gr-shadow);
+      transition: box-shadow .25s ease, border-color .25s ease;
+      overflow: hidden;
+    }
+    .cat-card:hover { box-shadow: var(--gr-shadow-lg); border-color: #d8d2b6; }
+
+    /* Cabeçalho do card — botão de colapso (P7) */
+    .cat-card__toggle {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 22px 18px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      text-align: left;
+      gap: 10px;
+    }
+    .cat-card__toggle:hover .cat-card__title { color: var(--gr-espresso); }
+    .cat-card__title { display: flex; align-items: center; gap: 10px; font-family:'Fraunces',serif; font-weight:600; font-size:19px; color: var(--gr-ink); transition: color .2s; }
+    .cat-card__icon  { font-size: 22px; line-height:1; }
+    .cat-card__meta  { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .cat-card__count { font-size: 12px; color:#9a8a78; letter-spacing:.02em; white-space: nowrap; }
+    .cat-card__chevron {
+      width: 20px; height: 20px;
+      color: #9a8a78;
+      flex-shrink: 0;
+      transition: transform .25s ease;
+    }
+    .cat-card__toggle[aria-expanded="false"] .cat-card__chevron {
+      transform: rotate(-90deg);
+    }
+
+    /* Corpo do card colapsável — usa display para remoção limpa do layout (grid) */
+    .cat-card__body {
+      padding: 0 22px 18px;
+    }
+    .cat-card__body.collapsed {
+      display: none;
+    }
+
+    /* ============================================================
+       Chips de gênero (P2 estados adicionais)
+       ============================================================ */
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 13px;
+      margin: 3px 4px 3px 0;
+      font-size: 14px;
+      font-weight: 400;
+      color: var(--gr-ink);
+      background: var(--gr-cream);
+      border: 1px solid var(--gr-sand);
+      border-radius: 999px;
+      cursor: pointer;
+      user-select: none;
+      transition: all .18s ease;
+    }
+    .chip:hover:not([data-blocked="true"]) {
+      transform: translateY(-1px);
+      border-color: var(--gr-espresso);
+      background: #fff;
+      box-shadow: 0 4px 10px rgba(56,33,16,.08);
+    }
+    .chip .chip__check { width: 0; opacity: 0; transition: all .18s ease; display:inline-flex; align-items:center; }
+    .chip[aria-pressed="true"] {
+      background: var(--gr-ink);
+      color: #fff;
+      border-color: var(--gr-ink);
+      font-weight: 600;
+    }
+    .chip[aria-pressed="true"]:hover { background: var(--gr-espresso); border-color: var(--gr-espresso); }
+    .chip[aria-pressed="true"] .chip__check { width: 14px; opacity: 1; }
+
+    /* Estado de limite atingido (P2) */
+    .chip[data-blocked="true"] {
+      opacity: 0.38;
+      cursor: not-allowed;
+    }
+
+    /* Chip visualmente oculto pelo filtro de busca (P4) */
+    .chip.search-hidden {
+      opacity: 0.2;
+      pointer-events: none;
+    }
+
+    /* Shake animation (P2 + P5) */
+    @keyframes shake {
+      0%,100%{ transform: translateX(0); }
+      20%    { transform: translateX(-5px); }
+      40%    { transform: translateX(5px); }
+      60%    { transform: translateX(-4px); }
+      80%    { transform: translateX(4px); }
+    }
+    .shake { animation: shake .28s ease both; }
+
+    /* ============================================================
+       Transição entre telas
+       ============================================================ */
+    .screen { display: none; }
+    .screen.active {
+      display: block;
+      animation: fadeSlide .28s ease both;
+    }
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ============================================================
+       CTAs
+       ============================================================ */
+    .btn-primary {
+      background: var(--gr-ink);
+      color: #fff;
+      padding: 13px 24px;
+      border-radius: 10px;
+      font-weight: 600;
+      letter-spacing: .005em;
+      transition: background .2s ease, transform .15s ease, box-shadow .2s ease;
+      box-shadow: 0 2px 0 rgba(56,33,16,.18);
+      cursor: pointer;
+    }
+    .btn-primary:hover { background: var(--gr-espresso); }
+    .btn-primary:active { transform: translateY(1px); box-shadow: 0 1px 0 rgba(56,33,16,.18); }
+
+    /* Estado visual de desabilitado (mas botão é clicável para diagnóstico — P5) */
+    .btn-primary.visually-disabled {
+      background: var(--gr-sand);
+      color: #9a8a78;
+      box-shadow: none;
+    }
+    .btn-primary.visually-disabled:hover { background: var(--gr-sand); }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--gr-ink);
+      padding: 12px 22px;
+      border-radius: 10px;
+      font-weight: 600;
+      border: 2px solid var(--gr-sand);
+      transition: border-color .2s ease, background .2s ease;
+    }
+    .btn-secondary:hover { border-color: var(--gr-espresso); background: var(--gr-cream); }
+
+    .btn-ghost {
+      color: var(--gr-tea);
+      font-weight: 500;
+      border-bottom: 1px solid transparent;
+      transition: border-color .2s ease;
+      cursor: pointer;
+    }
+    .btn-ghost:hover { border-bottom-color: var(--gr-tea); }
+
+    /* Botão Gmail */
+    .gmail-btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      width: 100%;
+      max-width: 360px;
+      padding: 16px 22px;
+      background: #fff;
+      border: 1px solid var(--gr-sand);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: transform .18s ease, box-shadow .25s ease, border-color .25s ease;
+      box-shadow: var(--gr-shadow);
+    }
+    .gmail-btn:hover {
+      transform: translateY(-1px);
+      border-color: #d8d2b6;
+      box-shadow: var(--gr-shadow-lg);
+    }
+    .gmail-btn__label {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 500;
+      font-size: 18px;
+      letter-spacing: -.01em;
+      color: #3c4043;
+    }
+
+    /* ============================================================
+       Banner informativo da Tela B
+       ============================================================ */
+    .info-banner {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      background: linear-gradient(180deg, #FAF8F2 0%, #F0EEE4 100%);
+      border: 1px solid var(--gr-sand);
+      border-left: 4px solid var(--gr-moss);
+      padding: 16px 20px;
+      border-radius: 10px;
+      color: #4a3a28;
+      font-size: 14.5px;
+      line-height: 1.55;
+    }
+
+    /* Microcopy de faixa de seleção (P2) */
+    .range-hint {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      padding: 8px 14px;
+      background: #FFF8F0;
+      border: 1px solid #f0d5b0;
+      border-radius: 8px;
+      font-size: 13.5px;
+      color: #7a5a38;
+    }
+
+    /* ============================================================
+       Contador de seleção (estados P2)
+       ============================================================ */
+    .counter-neutral { color: #5a4a38; }
+    .counter-ok      { color: var(--gr-moss); font-weight: 700; }
+    .counter-warn    { color: var(--gr-warn); font-weight: 700; }
+
+    /* ============================================================
+       Mensagem de erro inline (P5)
+       ============================================================ */
+    .error-msg {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+      padding: 9px 14px;
+      background: #FFF0EE;
+      border: 1px solid #f0b0a8;
+      border-radius: 8px;
+      font-size: 13.5px;
+      color: var(--gr-error);
+      animation: fadeSlide .2s ease both;
+    }
+    .error-msg.visible { display: flex; }
+
+    /* ============================================================
+       Barra de busca (P4)
+       ============================================================ */
+    .search-bar-wrap {
+      position: relative;
+      max-width: 480px;
+    }
+    .search-bar-wrap .search-icon {
+      position: absolute;
+      left: 14px;
+      top: 13px;
+      color: #9a8a78;
+      pointer-events: none;
+    }
+    .search-bar-wrap input {
+      width: 100%;
+      padding: 11px 42px 11px 42px;
+      background: #fff;
+      border: 1.5px solid var(--gr-sand);
+      border-radius: 10px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 14.5px;
+      color: var(--gr-ink);
+      transition: border-color .2s ease, box-shadow .2s ease;
+    }
+    .search-bar-wrap input:focus-visible {
+      border-color: var(--gr-tea);
+      box-shadow: 0 0 0 3px rgba(0,99,93,.12);
+      outline: none;
+    }
+    .search-bar-wrap input::placeholder { color: #b3a695; }
+    .search-clear {
+      position: absolute;
+      right: 12px;
+      top: 12px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #9a8a78;
+      display: none;
+      padding: 4px;
+      border-radius: 4px;
+      transition: color .2s;
+    }
+    .search-clear:hover { color: var(--gr-ink); }
+    .search-clear.visible { display: flex; align-items: center; }
+
+    /* Card atenuado quando busca sem resultados (P4) */
+    .cat-card.search-empty { opacity: 0.45; }
+    .cat-card.search-empty .cat-card__toggle { pointer-events: none; }
+    .search-empty-badge {
+      display: none;
+      font-size: 11px;
+      padding: 2px 8px;
+      background: var(--gr-sand);
+      color: #9a8a78;
+      border-radius: 999px;
+      margin-left: 6px;
+    }
+    .cat-card.search-empty .search-empty-badge { display: inline-flex; align-items: center; }
+
+    /* ============================================================
+       Input inline "envie seu convite" (P1)
+       ============================================================ */
+    .inline-panel {
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 14px;
+      padding: 18px 20px;
+      background: #fff;
+      border: 1px solid var(--gr-sand);
+      border-radius: 12px;
+      box-shadow: var(--gr-shadow);
+      animation: fadeSlide .22s ease both;
+    }
+    .inline-panel.visible { display: flex; }
+    .inline-panel input,
+    .inline-panel textarea {
+      padding: 10px 14px;
+      border: 1.5px solid var(--gr-sand);
+      border-radius: 8px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 14px;
+      color: var(--gr-ink);
+      background: var(--gr-cream);
+      transition: border-color .2s;
+    }
+    .inline-panel input:focus-visible,
+    .inline-panel textarea:focus-visible {
+      border-color: var(--gr-tea);
+      outline: 2.5px solid rgba(0,99,93,.15);
+      outline-offset: 2px;
+    }
+    .inline-panel__feedback {
+      font-size: 13px;
+      display: none;
+    }
+    .inline-panel__feedback.success { color: var(--gr-moss); display: block; }
+    .inline-panel__feedback.error   { color: var(--gr-error); display: block; }
+
+    /* ============================================================
+       MODAIS (P1)
+       ============================================================ */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(30,20,10,.45);
+      backdrop-filter: blur(2px);
+      z-index: 50;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-overlay.open { display: flex; animation: fadeIn .2s ease both; }
+    @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+
+    .modal-box {
+      background: var(--gr-cream);
+      border: 1px solid var(--gr-sand);
+      border-radius: 18px;
+      padding: 32px 32px 28px;
+      max-width: 460px;
+      width: 100%;
+      box-shadow: 0 8px 40px rgba(56,33,16,.18);
+      animation: slideUp .22s ease both;
+    }
+    @keyframes slideUp { from { transform: translateY(18px); opacity:0; } to { transform: translateY(0); opacity:1; } }
+
+    .modal-box h2 {
+      font-family: 'Fraunces', serif;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--gr-ink);
+      margin-bottom: 10px;
+    }
+    .modal-box p { font-size: 15px; color: #5a4a38; line-height: 1.6; margin-bottom: 22px; }
+    .modal-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
+
+    /* Lista de gêneros no modal de confirmação */
+    .genre-confirm-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 14px 0 22px;
+      max-height: 160px;
+      overflow-y: auto;
+    }
+    .genre-confirm-tag {
+      background: var(--gr-ink);
+      color: #fff;
+      font-size: 13px;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-weight: 500;
+    }
+
+    /* ============================================================
+       TOASTS (P1 · P2)
+       ============================================================ */
+    #toast-container {
+      position: fixed;
+      bottom: 28px;
+      right: 28px;
+      z-index: 60;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+    .toast {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px 18px;
+      background: var(--gr-ink);
+      color: #fff;
+      border-radius: 12px;
+      font-size: 14px;
+      line-height: 1.45;
+      max-width: 320px;
+      box-shadow: 0 4px 20px rgba(56,33,16,.22);
+      animation: toastIn .25s ease both;
+      pointer-events: all;
+    }
+    .toast.toast-limit { background: #7a3520; }
+    .toast.toast-info  { background: #1a4a46; }
+    @keyframes toastIn {
+      from { opacity:0; transform: translateX(30px); }
+      to   { opacity:1; transform: translateX(0); }
+    }
+    @keyframes toastOut {
+      from { opacity:1; transform: translateX(0); }
+      to   { opacity:0; transform: translateX(30px); }
+    }
+    .toast.hiding { animation: toastOut .25s ease both; }
+
+    /* ============================================================
+       Detalhe editorial
+       ============================================================ */
+    .rule { height: 1px; background: var(--gr-sand); }
+    .ordinal { font-family: 'Fraunces', serif; font-style: italic; color: #b3a695; font-weight: 400; }
+
+    /* Util */
+    .sr-only {
+      position: absolute; width: 1px; height: 1px;
+      padding: 0; margin: -1px; overflow: hidden;
+      clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+    }
+  </style>
+</head>
+<body class="min-h-screen">
+
+  <!-- ============================================================
+       MODAIS (P1)
+       ============================================================ -->
+
+  <!-- Modal Gmail -->
+  <div id="modal-gmail" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-gmail-title">
+    <div class="modal-box">
+      <h2 id="modal-gmail-title">🔒 Conexão simulada</h2>
+      <p>
+        Este protótipo é um artefato acadêmico. A integração real com o Gmail está fora do escopo.
+        <br><br>
+        <strong>Deseja continuar como se a conexão tivesse sido bem-sucedida?</strong>
+      </p>
+      <div class="modal-actions">
+        <button type="button" id="modal-gmail-cancel" class="btn-secondary">Cancelar</button>
+        <button type="button" id="modal-gmail-confirm" class="btn-primary inline-flex items-center gap-2">
+          Continuar
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Confirmação de Gêneros -->
+  <div id="modal-confirm" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-confirm-title">
+    <div class="modal-box">
+      <h2 id="modal-confirm-title">Confirmar seleção</h2>
+      <p>Estes são os gêneros que você escolheu para personalizar suas recomendações:</p>
+      <div id="genre-confirm-list" class="genre-confirm-list" aria-label="Gêneros selecionados"></div>
+      <p style="margin-bottom:22px; font-size:13.5px; color:#9a8a78;">Você poderá alterar isso nas suas preferências a qualquer momento.</p>
+      <div class="modal-actions">
+        <button type="button" id="modal-confirm-back" class="btn-secondary">Revisar</button>
+        <button type="button" id="modal-confirm-ok" class="btn-primary inline-flex items-center gap-2">
+          Confirmar e avançar
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast container -->
+  <div id="toast-container" aria-live="assertive" aria-atomic="false"></div>
+
+  <!-- ============================================================
+       CABEÇALHO PERSISTENTE — Stepper P3 (pílulas, sem skewX)
+       ============================================================ -->
+  <header class="border-b border-[#E9E5D0]/70 bg-[#FAF8F2]/80 backdrop-blur sticky top-0 z-20">
+    <div class="max-w-6xl mx-auto px-5 md:px-8 py-4 flex items-center gap-6 md:gap-10">
+      <a href="#" id="logo-link" class="font-serif-display italic text-2xl md:text-[26px] font-bold tracking-tight text-[var(--gr-ink)] shrink-0" aria-label="Goodreads · Voltar ao início">
+        goodreads
+      </a>
+
+      <span class="hidden sm:inline-block w-px h-7 bg-[var(--gr-sand)]"></span>
+
+      <div class="hidden sm:flex items-center gap-2">
+        <span class="font-serif-display text-[15px] md:text-base text-[var(--gr-espresso)] font-medium tracking-tight">Primeiros Passos</span>
+      </div>
+
+      <!-- Stepper · pílulas + separador › (resolve L4 — sem artefato visual) -->
+      <nav class="ml-auto flex items-center" aria-label="Progresso do cadastro">
+        <div class="stepper">
+          <div id="step-1" class="step-pill active" aria-current="step">
+            <span class="step-pill__num">1</span><span class="step-pill__label">. Encontrar amigos</span>
+          </div>
+          <span class="step-sep" aria-hidden="true">›</span>
+          <div id="step-2" class="step-pill pending">
+            <span class="step-pill__num">2</span><span class="step-pill__label">. Meta de leitura</span>
+          </div>
+          <span class="step-sep" aria-hidden="true">›</span>
+          <!-- P3: renomeado de "Avaliar livros" para "Escolher gêneros" -->
+          <div id="step-3" class="step-pill pending">
+            <span class="step-pill__num">3</span><span class="step-pill__label">. Escolher gêneros</span>
+          </div>
+          <span class="step-sep" aria-hidden="true">›</span>
+          <div id="step-4" class="step-pill pending">
+            <span class="step-pill__num">4</span><span class="step-pill__label">. Ver recomendações</span>
+          </div>
+        </div>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-5 md:px-8 py-10 md:py-16">
+
+    <!-- ============================================================
+         TELA A · ENCONTRAR AMIGOS
+         ============================================================ -->
+    <section id="screen-a" class="screen active" aria-labelledby="title-a">
+
+      <p class="ordinal text-sm mb-3">Etapa 01 de 04</p>
+
+      <div class="grid grid-cols-1 lg:grid-cols-[1.45fr_1fr] gap-10 lg:gap-16 items-start">
+
+        <!-- Coluna principal -->
+        <div>
+          <h1 id="title-a" class="font-serif-display text-[34px] sm:text-[42px] lg:text-[48px] leading-[1.08] font-bold text-[var(--gr-ink)] tracking-tight">
+            Receba recomendações<br/>
+            de livros dos seus <em class="italic text-[var(--gr-espresso)]">amigos</em>.
+          </h1>
+
+          <p class="mt-5 text-[17px] leading-relaxed text-[#5a4a38] max-w-[520px]">
+            Verifique seu catálogo de endereços para encontrar amigos no Goodreads:
+          </p>
+
+          <!-- Botão Gmail (P1 — responde com modal) -->
+          <button type="button" id="gmail-btn" class="gmail-btn mt-7 group" aria-label="Conectar com Gmail">
+            <span class="flex items-center gap-4">
+              <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true">
+                <path fill="#4285F4" d="M2 6.5v11A1.5 1.5 0 0 0 3.5 19H5V8.7l7 5.1 7-5.1V19h1.5A1.5 1.5 0 0 0 22 17.5v-11L12 13.8 2 6.5z"/>
+                <path fill="#34A853" d="M5 19V8.7l7 5.1V19H5z"/>
+                <path fill="#FBBC04" d="M19 8.7V19h-7v-5.2l7-5.1z"/>
+                <path fill="#EA4335" d="M2 6.5L12 13.8 22 6.5V5a1.5 1.5 0 0 0-1.5-1.5h-17A1.5 1.5 0 0 0 2 5v1.5z"/>
+                <path fill="#C5221F" d="M2 6.5V5a1.5 1.5 0 0 1 1.5-1.5H5v5.2L2 6.5z"/>
+              </svg>
+              <span class="gmail-btn__label">Gmail</span>
+            </span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true" class="text-[#9a8a78] group-hover:text-[var(--gr-espresso)] transition-colors">
+              <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+
+          <!-- Link "envie seu próprio convite" (P1 — revela inline) -->
+          <p class="mt-3 ml-1">
+            <button type="button" id="toggle-invite" class="btn-ghost text-[14.5px]">ou envie seu próprio convite »</button>
+          </p>
+
+          <!-- Painel inline de convite (P1) -->
+          <div id="invite-panel" class="inline-panel" aria-live="polite">
+            <label for="invite-email" class="text-[13.5px] font-medium text-[var(--gr-ink)]">E-mail do amigo</label>
+            <input type="email" id="invite-email" placeholder="nome@exemplo.com" autocomplete="email" />
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+              <button type="button" id="invite-send" class="btn-primary" style="padding: 10px 20px; font-size:14px;">Enviar convite</button>
+              <button type="button" id="invite-close" class="btn-ghost text-[13px]">Cancelar</button>
+            </div>
+            <p id="invite-feedback" class="inline-panel__feedback" role="alert" aria-live="assertive"></p>
+          </div>
+        </div>
+
+        <!-- Coluna lateral · explicação -->
+        <aside class="lg:pt-3">
+          <div class="lg:border-l lg:border-[var(--gr-sand)] lg:pl-8">
+            <p class="text-[15px] leading-[1.7] text-[#5a4a38]">
+              Comparamos seu catálogo de endereços com todos os
+              <strong class="text-[var(--gr-ink)] font-semibold">90&nbsp;milhões de membros</strong>
+              do Goodreads e mostramos quem já está no site. Você também pode convidar amigos
+              que ainda não estão cadastrados para comparar livros com eles.
+            </p>
+
+            <div class="rule my-7"></div>
+
+            <p class="text-right">
+              <button type="button" id="skip-a" class="btn-ghost text-[14px]">Pular esta etapa »</button>
+            </p>
+          </div>
+        </aside>
+      </div>
+
+      <!-- Controle do protótipo (rodapé local da tela) -->
+      <div class="mt-16 pt-8 border-t border-[var(--gr-sand)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <p class="text-xs uppercase tracking-[.14em] text-[#9a8a78]">Protótipo · Ciclo 3 IHC</p>
+        <button type="button" id="goto-b" class="btn-primary inline-flex items-center gap-2">
+          Próxima tela: Escolher gêneros
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+    </section>
+
+
+    <!-- ============================================================
+         TELA B · ESCOLHER GÊNEROS (stepper step 3 renomeado)
+         ============================================================ -->
+    <section id="screen-b" class="screen" aria-labelledby="title-b">
+
+      <p class="ordinal text-sm mb-3">Etapa 03 de 04</p>
+
+      <div class="max-w-4xl">
+        <h1 id="title-b" class="font-serif-display text-[32px] sm:text-[40px] lg:text-[44px] leading-[1.1] font-bold text-[var(--gr-ink)] tracking-tight">
+          A seguir, selecione seus <em class="italic text-[var(--gr-espresso)]">gêneros favoritos</em>.
+        </h1>
+
+        <!-- Banner informativo -->
+        <div class="info-banner mt-7" role="note">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true" class="shrink-0 mt-[2px] text-[var(--gr-moss)]">
+            <path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H11v16H5.5A1.5 1.5 0 0 1 4 17.5v-13zM20 4.5A1.5 1.5 0 0 0 18.5 3H13v16h5.5a1.5 1.5 0 0 0 1.5-1.5v-13z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+          </svg>
+          <p>
+            Usamos seus gêneros favoritos para fazer
+            <strong class="text-[var(--gr-ink)]">melhores recomendações de livros</strong>
+            e personalizar o que você vê em seu feed de Novidades.
+          </p>
+        </div>
+
+        <!-- Microcopy faixa de seleção (P2 — instrução antes da interação) -->
+        <div class="range-hint" role="note" aria-label="Instrução de seleção">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          Escolha entre <strong>3 e 10 gêneros</strong> para recebermos boas recomendações.
+        </div>
+      </div>
+
+      <!-- Barra de busca (P4) -->
+      <div class="mt-8 search-bar-wrap" role="search" aria-label="Filtrar gêneros">
+        <svg class="search-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/>
+          <path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <input
+          type="text"
+          id="genre-search"
+          placeholder="Buscar gênero (ex.: fantasia, biografia…)"
+          autocomplete="off"
+          aria-label="Buscar gênero"
+        />
+        <button type="button" id="search-clear" class="search-clear" aria-label="Limpar busca">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Grade de 6 categorias (P7 — colapso por categoria) -->
+      <div id="cat-grid" class="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6">
+        <!-- Renderizado via JS -->
+      </div>
+
+      <!-- Link "Não vê seus gêneros?" (P1 — revela input livre) -->
+      <p class="mt-8">
+        <button type="button" id="toggle-custom-genre" class="btn-ghost text-[14px]">Não vê seus gêneros favoritos aqui?</button>
+      </p>
+
+      <!-- Painel inline de gênero personalizado (P1 + P9 critério aceitação) -->
+      <div id="custom-genre-panel" class="inline-panel" style="max-width:480px;" aria-live="polite">
+        <label for="custom-genre-input" class="text-[13.5px] font-medium text-[var(--gr-ink)]">
+          Adicione um gênero que não está na lista
+        </label>
+        <p class="text-[12.5px] text-[#9a8a78]" style="margin-top:-4px;">Sugestões: Graphic Novel adulta, Ensaio, Literatura Latino-americana…</p>
+        <input type="text" id="custom-genre-input" placeholder="ex.: Ficção científica filosófica" maxlength="60" />
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+          <button type="button" id="custom-genre-add" class="btn-primary" style="padding: 10px 20px; font-size:14px;">Adicionar gênero</button>
+          <button type="button" id="custom-genre-close" class="btn-ghost text-[13px]">Cancelar</button>
+        </div>
+        <div id="custom-genre-chips" class="flex flex-wrap gap-2 mt-1"></div>
+        <p id="custom-genre-feedback" class="inline-panel__feedback" role="alert" aria-live="assertive"></p>
+      </div>
+
+      <!-- Rodapé de ação -->
+      <div class="mt-10 pt-8 border-t border-[var(--gr-sand)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
+        <div>
+          <!-- Contador (P2 · estados: neutro / ok / aviso) -->
+          <p id="counter" class="text-[15px]" aria-live="polite">
+            <strong id="counter-num" class="font-semibold">0</strong>
+            <span id="counter-text"> gêneros selecionados</span>
+          </p>
+          <p class="text-xs text-[#9a8a78] mt-1">Você pode editar isso depois nas suas preferências.</p>
+
+          <!-- Mensagem de erro inline (P5 — diagnóstico) -->
+          <div id="error-msg" class="error-msg" role="alert" aria-live="assertive">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="flex-shrink:0;">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.8"/>
+              <path d="M12 8v5M12 16h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <span id="error-msg-text"></span>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-4">
+          <button type="button" id="back-a" class="btn-ghost text-[14.5px] inline-flex items-center gap-1">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M19 12H5M11 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Voltar
+          </button>
+          <!-- Botão sempre clicável para diagnóstico (P5) -->
+          <button type="button" id="continue-btn" class="btn-primary visually-disabled inline-flex items-center gap-2" aria-describedby="error-msg">
+            <span id="continue-label">Selecione ao menos 3 gêneros</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="max-w-6xl mx-auto px-5 md:px-8 py-8 text-xs text-[#9a8a78] flex flex-col sm:flex-row justify-between gap-2">
+    <span>© Protótipo acadêmico · não é o Goodreads oficial</span>
+    <span class="font-serif-display italic">Ciclo 3 de Engenharia de Usabilidade</span>
+  </footer>
+
+  <!-- ============================================================
+       SCRIPT · estado, render e interações (Ciclo 3)
+       ============================================================ -->
+  <script>
+    /* ---------------------------------------------------------------
+       CONSTANTES DE DOMÍNIO (P2)
+       --------------------------------------------------------------- */
+    const MIN_SELECT = 3;
+    const MAX_SELECT = 10;
+
+    /* ---------------------------------------------------------------
+       DADOS · 6 categorias × 40 gêneros
+       P6: 🐉 → 🌌 para Ficção (ícone ambíguo substituído)
+       --------------------------------------------------------------- */
+    const CATEGORIES = [
+      {
+        id: 'formato',
+        icon: '📐',
+        title: 'Formato',
+        genres: ['Quadrinhos', 'E-book', 'Graphic Novel', 'Mangá', 'Poesia']
+      },
+      {
+        id: 'nao-ficcao',
+        icon: '📖',
+        title: 'Não-Ficção',
+        genres: ['Biografia', 'Negócios', 'Cristão', 'Culinária', 'Memórias', 'Não-Ficção', 'Religião', 'Espiritualidade', 'Autoajuda']
+      },
+      {
+        id: 'ficcao',
+        icon: '🌌',   /* P6: substituído de 🐉 (marcador de Fantasia) por 🌌 (universo/imaginação — representa Ficção como categoria ampla) */
+        title: 'Ficção',
+        genres: ['Fantasia', 'Ficção', 'Ficção Histórica', 'Ficção Científica']
+      },
+      {
+        id: 'temas',
+        icon: '🎭',
+        title: 'Temas',
+        genres: ['Crime', 'Terror', 'Mistério', 'Paranormal', 'Romance', 'Suspense', 'Thriller']
+      },
+      {
+        id: 'assunto',
+        icon: '🎨',
+        title: 'Assunto',
+        genres: ['Arte', 'LGBTQIA+', 'História', 'Humor', 'Música', 'Psicologia', 'Ciência', 'Esportes', 'Viagem']
+      },
+      {
+        id: 'literatura',
+        icon: '📚',
+        title: 'Literatura',
+        genres: ['Chick Lit', 'Infantil', 'Clássicos', 'Contemporâneo', 'Jovem Adulto']
+      }
+    ];
+
+    /* ---------------------------------------------------------------
+       ESTADO
+       --------------------------------------------------------------- */
+    const selected = new Set();
+    const customGenres = [];
+    let errorTimeout = null;
+
+    /* ---------------------------------------------------------------
+       RENDER · cards com colapso (P7) + chips (P2 estados)
+       --------------------------------------------------------------- */
+    const grid = document.getElementById('cat-grid');
+
+    CATEGORIES.forEach(cat => {
+      const card = document.createElement('section');
+      card.className = 'cat-card';
+      card.setAttribute('aria-labelledby', `cat-title-${cat.id}`);
+      card.dataset.catId = cat.id;
+
+      const bodyId = `cat-body-${cat.id}`;
+
+      card.innerHTML = `
+        <!-- Botão de colapso (P7) -->
+        <button
+          type="button"
+          class="cat-card__toggle"
+          aria-expanded="true"
+          aria-controls="${bodyId}"
+          id="cat-toggle-${cat.id}"
+        >
+          <h2 id="cat-title-${cat.id}" class="cat-card__title">
+            <span class="cat-card__icon" aria-hidden="true">${cat.icon}</span>
+            <span>${cat.title}</span>
+            <span class="search-empty-badge" aria-label="Nenhum gênero visível nesta categoria">0 visíveis</span>
+          </h2>
+          <span class="cat-card__meta">
+            <span class="cat-card__count" id="cat-count-${cat.id}">${cat.genres.length} gêneros</span>
+            <svg class="cat-card__chevron" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </button>
+
+        <!-- Corpo colapsável (P7) -->
+        <div
+          id="${bodyId}"
+          class="cat-card__body"
+          role="group"
+          aria-label="Gêneros de ${cat.title}"
+        >
+          <div class="flex flex-wrap">
+            ${cat.genres.map(g => `
+              <button type="button"
+                      class="chip"
+                      role="switch"
+                      aria-pressed="false"
+                      aria-label="${g}"
+                      data-genre="${g}"
+                      data-cat="${cat.id}">
+                <span class="chip__check" aria-hidden="true">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </span>
+                <span class="chip__label">${g}</span>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      `;
+
+      grid.appendChild(card);
+
+      // Toggle colapso (P7) — usa display:none para remoção limpa do layout grid
+      const body = card.querySelector(`#${bodyId}`);
+      const toggle = card.querySelector(`#cat-toggle-${cat.id}`);
+      toggle.addEventListener('click', () => {
+        const expanded = toggle.getAttribute('aria-expanded') === 'true';
+        toggle.setAttribute('aria-expanded', String(!expanded));
+        if (expanded) {
+          body.classList.add('collapsed');
+        } else {
+          body.classList.remove('collapsed');
+        }
+        updateCatCount(cat);
+      });
+    });
+
+    /* ---------------------------------------------------------------
+       INTERAÇÃO · chips (P2 faixa, P5 diagnóstico)
+       --------------------------------------------------------------- */
+    grid.addEventListener('click', (e) => {
+      const chip = e.target.closest('.chip');
+      if (!chip) return;
+      toggleChip(chip);
+    });
+
+    function toggleChip(chip) {
+      const genre = chip.dataset.genre;
+      const isOn  = chip.getAttribute('aria-pressed') === 'true';
+
+      if (!isOn) {
+        // Tentando selecionar
+        if (selected.size >= MAX_SELECT) {
+          // P2 — impede e explica
+          triggerShake(chip);
+          showToast(`Limite atingido (${MAX_SELECT} gêneros). Desmarque um para escolher outro.`, 'toast-limit');
+          return;
+        }
+        chip.setAttribute('aria-pressed', 'true');
+        chip.removeAttribute('data-blocked');
+        selected.add(genre);
+      } else {
+        chip.setAttribute('aria-pressed', 'false');
+        selected.delete(genre);
+      }
+
+      updateUI();
+      hideError(); // limpa mensagem de erro ao interagir
+    }
+
+    function updateBlockedState() {
+      // P2 — bloqueia chips não selecionados quando MAX atingido
+      const atMax = selected.size >= MAX_SELECT;
+      document.querySelectorAll('.chip').forEach(c => {
+        const isSelected = c.getAttribute('aria-pressed') === 'true';
+        if (!isSelected) {
+          if (atMax) {
+            c.setAttribute('data-blocked', 'true');
+          } else {
+            c.removeAttribute('data-blocked');
+          }
+        }
+      });
+    }
+
+    /* ---------------------------------------------------------------
+       UPDATE UI · contador, botão continuar, blocked state (P2)
+       --------------------------------------------------------------- */
+    const counterEl    = document.getElementById('counter');
+    const counterNum   = document.getElementById('counter-num');
+    const counterText  = document.getElementById('counter-text');
+    const continueBtn  = document.getElementById('continue-btn');
+    const continueLabel = document.getElementById('continue-label');
+
+    function updateUI() {
+      const n = selected.size;
+
+      // Contador com estados de cor (P2)
+      counterNum.textContent = n;
+      if (n === 0) {
+        counterNum.className = 'font-semibold counter-neutral';
+        counterText.textContent = ' gêneros selecionados';
+      } else if (n < MIN_SELECT) {
+        const faltam = MIN_SELECT - n;
+        counterNum.className = 'font-semibold counter-neutral';
+        counterText.textContent = ` gênero${n === 1 ? '' : 's'} selecionado${n === 1 ? '' : 's'} — faltam ${faltam} para o mínimo`;
+      } else if (n === MAX_SELECT) {
+        counterNum.className = 'font-semibold counter-warn';
+        counterText.textContent = ` gêneros selecionados (máximo atingido)`;
+      } else {
+        counterNum.className = 'font-semibold counter-ok';
+        counterText.textContent = ` gênero${n === 1 ? '' : 's'} selecionado${n === 1 ? '' : 's'}`;
+      }
+
+      // Estado visual do botão (sempre clicável para diagnóstico — P5)
+      const valid = n >= MIN_SELECT && n <= MAX_SELECT;
+      if (valid) {
+        continueBtn.classList.remove('visually-disabled');
+        continueLabel.textContent = `Continuar com ${n} gênero${n === 1 ? '' : 's'}`;
+      } else {
+        continueBtn.classList.add('visually-disabled');
+        if (n === 0) {
+          continueLabel.textContent = 'Selecione ao menos 3 gêneros';
+        } else if (n < MIN_SELECT) {
+          continueLabel.textContent = `Selecione mais ${MIN_SELECT - n} gênero${MIN_SELECT - n === 1 ? '' : 's'}`;
+        }
+      }
+
+      updateBlockedState();
+      CATEGORIES.forEach(cat => updateCatCount(cat));
+    }
+
+    function updateCatCount(cat) {
+      const countEl = document.getElementById(`cat-count-${cat.id}`);
+      if (!countEl) return;
+      const selInCat = cat.genres.filter(g => selected.has(g)).length;
+      const total    = cat.genres.length;
+      if (selInCat > 0) {
+        countEl.textContent = `${selInCat} de ${total} selecionados`;
+      } else {
+        const toggle = document.getElementById(`cat-toggle-${cat.id}`);
+        const collapsed = toggle && toggle.getAttribute('aria-expanded') === 'false';
+        countEl.textContent = collapsed ? `${total} gêneros` : `${total} gêneros`;
+      }
+    }
+
+    /* ---------------------------------------------------------------
+       BOTÃO CONTINUAR — diagnóstico (P5)
+       --------------------------------------------------------------- */
+    continueBtn.addEventListener('click', () => {
+      const n = selected.size;
+      const valid = n >= MIN_SELECT && n <= MAX_SELECT;
+
+      if (!valid) {
+        // P5 — diagnóstico explícito: O QUE + COMO
+        triggerShake(continueBtn);
+        let msg = '';
+        if (n === 0) {
+          msg = `Nenhum gênero selecionado. Selecione ao menos ${MIN_SELECT} para continuar.`;
+        } else if (n < MIN_SELECT) {
+          const faltam = MIN_SELECT - n;
+          msg = `Você selecionou apenas ${n} gênero${n === 1 ? '' : 's'}. Selecione mais ${faltam} para continuar (mínimo: ${MIN_SELECT}).`;
+        }
+        showError(msg);
+        return;
+      }
+
+      // Abre modal de confirmação (P1)
+      openConfirmModal();
+    });
+
+    /* ---------------------------------------------------------------
+       MENSAGEM DE ERRO INLINE (P5)
+       --------------------------------------------------------------- */
+    const errorMsgEl   = document.getElementById('error-msg');
+    const errorMsgText = document.getElementById('error-msg-text');
+
+    function showError(msg) {
+      errorMsgText.textContent = msg;
+      errorMsgEl.classList.add('visible');
+      clearTimeout(errorTimeout);
+      errorTimeout = setTimeout(hideError, 4000);
+    }
+    function hideError() {
+      errorMsgEl.classList.remove('visible');
+      clearTimeout(errorTimeout);
+    }
+
+    /* ---------------------------------------------------------------
+       SHAKE ANIMATION (P2 · P5)
+       --------------------------------------------------------------- */
+    function triggerShake(el) {
+      el.classList.remove('shake');
+      void el.offsetWidth; // reflow para reiniciar animação
+      el.classList.add('shake');
+      el.addEventListener('animationend', () => el.classList.remove('shake'), { once: true });
+    }
+
+    /* ---------------------------------------------------------------
+       TOASTS (P1 · P2)
+       --------------------------------------------------------------- */
+    const toastContainer = document.getElementById('toast-container');
+
+    function showToast(message, type = 'toast-info', duration = 4000) {
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.setAttribute('role', 'status');
+      toast.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="flex-shrink:0;margin-top:1px;">
+          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.8"/>
+          <path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span>${message}</span>
+      `;
+      toastContainer.appendChild(toast);
+      setTimeout(() => {
+        toast.classList.add('hiding');
+        toast.addEventListener('animationend', () => toast.remove(), { once: true });
+      }, duration);
+    }
+
+    /* ---------------------------------------------------------------
+       MODAL GMAIL (P1)
+       --------------------------------------------------------------- */
+    const modalGmail = document.getElementById('modal-gmail');
+
+    document.getElementById('gmail-btn').addEventListener('click', () => {
+      modalGmail.classList.add('open');
+      document.getElementById('modal-gmail-cancel').focus();
+    });
+    document.getElementById('modal-gmail-cancel').addEventListener('click', () => {
+      modalGmail.classList.remove('open');
+    });
+    document.getElementById('modal-gmail-confirm').addEventListener('click', () => {
+      modalGmail.classList.remove('open');
+      showToast('Gmail conectado com sucesso (simulado)! Amigos encontrados: 12.', 'toast-info', 5000);
+      showScreen('b');
+    });
+    modalGmail.addEventListener('click', (e) => {
+      if (e.target === modalGmail) modalGmail.classList.remove('open');
+    });
+
+    /* ---------------------------------------------------------------
+       MODAL CONFIRMAÇÃO DE GÊNEROS (P1)
+       --------------------------------------------------------------- */
+    const modalConfirm   = document.getElementById('modal-confirm');
+    const genreListEl    = document.getElementById('genre-confirm-list');
+
+    function openConfirmModal() {
+      genreListEl.innerHTML = '';
+      const all = [...selected, ...customGenres.filter(g => selected.has(g))];
+      selected.forEach(g => {
+        const tag = document.createElement('span');
+        tag.className = 'genre-confirm-tag';
+        tag.textContent = g;
+        genreListEl.appendChild(tag);
+      });
+      modalConfirm.classList.add('open');
+      document.getElementById('modal-confirm-back').focus();
+    }
+
+    document.getElementById('modal-confirm-back').addEventListener('click', () => {
+      modalConfirm.classList.remove('open');
+    });
+    document.getElementById('modal-confirm-ok').addEventListener('click', () => {
+      modalConfirm.classList.remove('open');
+      showToast('Gêneros salvos com sucesso! Redirecionando… (simulado)', 'toast-info', 5000);
+    });
+    modalConfirm.addEventListener('click', (e) => {
+      if (e.target === modalConfirm) modalConfirm.classList.remove('open');
+    });
+
+    /* ---------------------------------------------------------------
+       LINK "ENVIE SEU PRÓPRIO CONVITE" (P1 — inline)
+       --------------------------------------------------------------- */
+    const invitePanel    = document.getElementById('invite-panel');
+    const inviteEmail    = document.getElementById('invite-email');
+    const inviteFeedback = document.getElementById('invite-feedback');
+
+    document.getElementById('toggle-invite').addEventListener('click', () => {
+      invitePanel.classList.toggle('visible');
+      if (invitePanel.classList.contains('visible')) inviteEmail.focus();
+    });
+    document.getElementById('invite-close').addEventListener('click', () => {
+      invitePanel.classList.remove('visible');
+      inviteFeedback.textContent = '';
+      inviteFeedback.className = 'inline-panel__feedback';
+    });
+    document.getElementById('invite-send').addEventListener('click', () => {
+      const email = inviteEmail.value.trim();
+      const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+      inviteFeedback.className = 'inline-panel__feedback';
+      if (!valid) {
+        inviteFeedback.classList.add('error');
+        inviteFeedback.textContent = 'E-mail inválido. Verifique o formato (ex.: nome@dominio.com) e tente novamente.';
+      } else {
+        inviteFeedback.classList.add('success');
+        inviteFeedback.textContent = `✓ Convite enviado para ${email}!`;
+        inviteEmail.value = '';
+        // Redireciona para tela B após envio bem-sucedido (simulado)
+        setTimeout(() => {
+          invitePanel.classList.remove('visible');
+          inviteFeedback.textContent = '';
+          inviteFeedback.className = 'inline-panel__feedback';
+          showToast(`Convite enviado para ${email} (simulado).`, 'toast-info', 4000);
+          showScreen('b');
+        }, 1200);
+      }
+    });
+
+    /* ---------------------------------------------------------------
+       LINK "NÃO VÊ SEUS GÊNEROS?" → input livre (P1 + L9 req. 9)
+       --------------------------------------------------------------- */
+    const customPanel    = document.getElementById('custom-genre-panel');
+    const customInput    = document.getElementById('custom-genre-input');
+    const customChips    = document.getElementById('custom-genre-chips');
+    const customFeedback = document.getElementById('custom-genre-feedback');
+
+    document.getElementById('toggle-custom-genre').addEventListener('click', () => {
+      customPanel.classList.toggle('visible');
+      if (customPanel.classList.contains('visible')) customInput.focus();
+    });
+    document.getElementById('custom-genre-close').addEventListener('click', () => {
+      // Remove TODOS os gêneros customizados da seleção e limpa os chips visuais
+      customGenres.forEach(g => selected.delete(g));
+      customGenres.length = 0;
+      customChips.innerHTML = '';
+      customInput.value = '';
+      customFeedback.textContent = '';
+      customFeedback.className = 'inline-panel__feedback';
+      customPanel.classList.remove('visible');
+      updateUI();
+    });
+    document.getElementById('custom-genre-add').addEventListener('click', () => {
+      const val = customInput.value.trim();
+      customFeedback.className = 'inline-panel__feedback';
+      if (!val) {
+        customFeedback.classList.add('error');
+        customFeedback.textContent = 'Digite um nome de gênero antes de adicionar.';
+        return;
+      }
+      if (val.length < 3) {
+        customFeedback.classList.add('error');
+        customFeedback.textContent = 'O nome do gênero deve ter ao menos 3 caracteres.';
+        return;
+      }
+      if (selected.size >= MAX_SELECT) {
+        customFeedback.classList.add('error');
+        customFeedback.textContent = `Limite de ${MAX_SELECT} gêneros atingido. Desmarque um para adicionar outro.`;
+        return;
+      }
+
+      // Adiciona o gênero customizado
+      customGenres.push(val);
+      selected.add(val);
+
+      // Chip visual no painel
+      const chip = document.createElement('span');
+      chip.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:5px 12px;background:var(--gr-ink);color:#fff;border-radius:999px;font-size:13px;font-weight:500;';
+      chip.textContent = val;
+      const rm = document.createElement('button');
+      rm.type = 'button';
+      rm.setAttribute('aria-label', `Remover ${val}`);
+      rm.style.cssText = 'background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;font-size:14px;line-height:1;padding:0 0 0 2px;';
+      rm.textContent = '×';
+      rm.addEventListener('click', () => {
+        selected.delete(val);
+        chip.remove();
+        updateUI();
+      });
+      chip.appendChild(rm);
+      customChips.appendChild(chip);
+
+      customFeedback.classList.add('success');
+      customFeedback.textContent = `✓ "${val}" adicionado à sua seleção!`;
+      customInput.value = '';
+      updateUI();
+    });
+
+    // Enter no input de gênero customizado
+    customInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('custom-genre-add').click();
+    });
+
+    /* ---------------------------------------------------------------
+       BUSCA / FILTRO TEXTUAL (P4)
+       --------------------------------------------------------------- */
+    const searchInput = document.getElementById('genre-search');
+    const searchClear = document.getElementById('search-clear');
+    let searchDebounce = null;
+
+    searchInput.addEventListener('input', () => {
+      clearTimeout(searchDebounce);
+      searchDebounce = setTimeout(applySearch, 150);
+      searchClear.classList.toggle('visible', searchInput.value.length > 0);
+    });
+
+    searchClear.addEventListener('click', () => {
+      searchInput.value = '';
+      searchClear.classList.remove('visible');
+      applySearch();
+      searchInput.focus();
+    });
+
+    function applySearch() {
+      const term = searchInput.value.trim().toLowerCase();
+
+      document.querySelectorAll('.cat-card').forEach(card => {
+        const chips = card.querySelectorAll('.chip');
+        let visibleCount = 0;
+        const catId = card.dataset.catId;
+        const toggle = document.getElementById(`cat-toggle-${catId}`);
+        const body   = document.getElementById(`cat-body-${catId}`);
+
+        chips.forEach(chip => {
+          const genre = chip.dataset.genre.toLowerCase();
+          const matches = !term || genre.includes(term);
+          chip.classList.toggle('search-hidden', !matches);
+          if (matches) visibleCount++;
+        });
+
+        // Se nenhum chip visível → atenua o card (P4)
+        card.classList.toggle('search-empty', term.length > 0 && visibleCount === 0);
+
+        if (term.length > 0) {
+          // Busca ativa: colapsar TODAS, expandir APENAS as que têm resultados
+          if (visibleCount > 0) {
+            toggle.setAttribute('aria-expanded', 'true');
+            body.classList.remove('collapsed');
+          } else {
+            toggle.setAttribute('aria-expanded', 'false');
+            body.classList.add('collapsed');
+          }
+        } else {
+          // Busca limpa: expandir todas de volta
+          toggle.setAttribute('aria-expanded', 'true');
+          body.classList.remove('collapsed');
+        }
+      });
+    }
+
+    // Atalho / para focar busca (P4) — só funciona quando a tela B está ativa
+    document.addEventListener('keydown', (e) => {
+      if (e.key === '/'
+          && screenB.classList.contains('active')
+          && document.activeElement.tagName !== 'INPUT'
+          && document.activeElement.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        searchInput.focus();
+        searchInput.select();
+      }
+    });
+
+    /* ---------------------------------------------------------------
+       NAVEGAÇÃO ENTRE TELAS + stepper
+       --------------------------------------------------------------- */
+    const screenA = document.getElementById('screen-a');
+    const screenB = document.getElementById('screen-b');
+    const steps   = [1,2,3,4].map(i => document.getElementById(`step-${i}`));
+
+    function showScreen(which) {
+      if (which === 'a') {
+        screenA.classList.add('active');
+        screenB.classList.remove('active');
+        setStep(steps[0], 'active');
+        setStep(steps[1], 'pending');
+        setStep(steps[2], 'pending');
+        setStep(steps[3], 'pending');
+        steps[0].setAttribute('aria-current', 'step');
+        steps[1].removeAttribute('aria-current');
+        steps[2].removeAttribute('aria-current');
+        steps[3].removeAttribute('aria-current');
+      } else {
+        screenB.classList.add('active');
+        screenA.classList.remove('active');
+        setStep(steps[0], 'done');
+        setStep(steps[1], 'done');
+        setStep(steps[2], 'active');
+        setStep(steps[3], 'pending');
+        steps[0].removeAttribute('aria-current');
+        steps[1].removeAttribute('aria-current');
+        steps[2].setAttribute('aria-current', 'step');
+        steps[3].removeAttribute('aria-current');
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function setStep(el, state) {
+      el.classList.remove('done', 'active', 'pending');
+      el.classList.add(state);
+    }
+
+    document.getElementById('goto-b').addEventListener('click', () => showScreen('b'));
+    document.getElementById('back-a').addEventListener('click', () => showScreen('a'));
+    document.getElementById('skip-a').addEventListener('click', () => showScreen('b'));
+
+    // Logo "goodreads" redireciona para etapa 1
+    document.getElementById('logo-link').addEventListener('click', (e) => {
+      e.preventDefault();
+      showScreen('a');
+    });
+
+    // Fechar modais com Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        modalGmail.classList.remove('open');
+        modalConfirm.classList.remove('open');
+      }
+    });
+  </script>
+</body>
+</html>
